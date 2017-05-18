@@ -7,17 +7,30 @@ try:
 except ImportError:
     abort('PyYaml not found. Install it with "pip install pyyaml"')
 
-class Configuration(object):
-    def __init__(self, name, profile, parent, properties):
+class Profile(object):
+    def __init__(self, name, parent):
         """
-        :name: name of the config file, e.g. yarn-site
-        :profile: Profile name
-        :parent: Parent profile to extend from
+        :name: profile name
+        :parent: parent profile name
+        """
+        self.name = name
+        self.parent = parent
+        self.config_map = dict()
+
+    def put_configuration(self, config):
+        self.config_map[config.name] = config
+
+    def write_config_files(self, profile_dir):
+        for config in self.config_map.values():
+            config.write_xml(profile_dir)
+
+class Configuration(object):
+    def __init__(self, name, properties):
+        """
+        :name: name of this config, e.g. yarn-site
         :properties: parsed property list
         """
         self.name = name
-        self.profile = profile
-        self.parent = parent
         self.properties = properties
 
     def write_xml(self, out_dir):
@@ -26,42 +39,63 @@ class Configuration(object):
         with open(filename, 'w', encoding='utf8') as xmlfile:
             print(hadoop_xml(self.properties), file=xmlfile)
 
+    def copy(self):
+        return Configuration(self.name, self.properties[:])
+
+    def extend(self, parent_config):
+        self.properties.extend(parent_config.properties)
+
+def generate_config_files(out_dir, profiles):
+    """
+    Write all config files of all profiles to the out_dir
+    """
+    ensure_dir(out_dir)
+    for profile in profiles:
+        profile_dir = os.path.join(out_dir, profile.name)
+        print('generating configuration for profile %s ...' % (profile.name))
+        ensure_dir(profile_dir)
+        profile.write_config_files(profile_dir)
+
+def apply_extends(profile_map):
+    """
+    Apply the parent profile for each configuration object
+    """
+    for this in profile_map.values():
+        if this.parent in profile_map:
+            for config in profile_map[this.parent].config_map.values():
+                if config.name in this.config_map:
+                    this.config_map[config.name].extend(config)
+                else:
+                    this.put_configuration(config.copy())
 
 def hadoop_xml(properties):
     import json
     return json.dumps(dict(properties), indent=2)
 
-def generate_config(out_dir, config_map):
-    ensure_dir(out_dir)
-    for (profile, config_list) in config_map.items():
-        profile_dir = os.path.join(out_dir, profile)
-        print('generating configuration for profile %s ...' % (profile))
-        ensure_dir(profile_dir)
-        for configuration in config_list:
-            configuration.write_xml(profile_dir)
-
-def make_configuration(profile, extends, document):
+def make_configuration(extends, document):
     """
     Split by config file name. Read properties for a single profile
-    :returns: list of Configuration object
+    :returns: a map from config file name to the Configuration object
     """
-    return [Configuration(key, profile, extends, properties(document[key]))
-            for key in document if not key.startswith('profile')]
+    return dict([(key, Configuration(key, properties(document[key])))
+                for key in document if not key.startswith('profile')])
 
-def parse_document(docs):
+def parse_config_by_profile(docs):
     """
     Split by profile. parse config file, gather properties for each profile.
     :returns: a hashmap from profile to a list of Configurations
     """
-    config_map = dict()
+    profile_map = dict()
     for doc in docs:
         try:
-            profile, extends = parse_profile(doc)
-        except Exception as e:
+            # profile_name, extends = parse_profile(doc)
+            profile = Profile(*parse_profile(doc))
+        except Exception as e: # when parse_profile returns None
             pass
         else:
-            config_map[profile] = make_configuration(profile, extends, doc)
-    return config_map
+            profile.config_map = make_configuration(profile.parent, doc)
+            profile_map[profile.name] = profile
+    return profile_map
 
 def parse_profile(doc):
     """
@@ -123,7 +157,9 @@ def ensure_dir(out_dir):
 
 def main(yaml_file, out_dir):
     with open(yaml_file, 'r', encoding='utf8') as file:
-        generate_config(out_dir, parse_document(yaml.load_all(file)))
+        profile_map = parse_config_by_profile(yaml.load_all(file))
+        apply_extends(profile_map)
+        generate_config_files(out_dir, profile_map.values())
 
 def parse_args():
     import argparse
