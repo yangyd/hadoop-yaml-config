@@ -8,14 +8,14 @@ except ImportError:
     abort('PyYaml not found. Install it with "pip install pyyaml"')
 
 class Profile(object):
-    def __init__(self, name, parent):
+    def __init__(self, name, parent, config_map):
         """
         :name: profile name
         :parent: parent profile name
         """
         self.name = name
         self.parent = parent
-        self.config_map = dict()
+        self.config_map = config_map
 
     def put_configuration(self, config):
         self.config_map[config.name] = config
@@ -88,13 +88,11 @@ def parse_config_by_profile(docs):
     profile_map = dict()
     for doc in docs:
         try:
-            # profile_name, extends = parse_profile(doc)
-            profile = Profile(*parse_profile(doc))
-        except Exception as e: # when parse_profile returns None
+            profile_name, parent_name = parse_profile(doc)
+            profile_map[profile_name] = Profile(profile_name, parent_name,
+                make_configuration(parent_name, doc))
+        except KeyError as e:
             pass
-        else:
-            profile.config_map = make_configuration(profile.parent, doc)
-            profile_map[profile.name] = profile
     return profile_map
 
 def parse_profile(doc):
@@ -105,10 +103,7 @@ def parse_profile(doc):
     try:
         name = doc['profile.name']
     except KeyError as e:
-        try:
-            name = doc['profile']['name']
-        except KeyError as e:
-            return None
+        name = doc['profile']['name'] # may throw another KeyError
 
     try:
         extends = doc['profile.extends']
