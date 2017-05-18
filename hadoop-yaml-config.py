@@ -28,7 +28,8 @@ class Configuration(object):
 
 
 def hadoop_xml(properties):
-    return yaml.dump(properties)
+    import json
+    return json.dumps(dict(properties), indent=2)
 
 def generate_config(out_dir, config_map):
     ensure_dir(out_dir)
@@ -123,9 +124,6 @@ def ensure_dir(out_dir):
 def main(yaml_file, out_dir):
     with open(yaml_file, 'r', encoding='utf8') as file:
         generate_config(out_dir, parse_document(yaml.load_all(file)))
-        # import json
-        # jj = json.dumps(parsed, indent=2)
-        # print(jj)
 
 def parse_args():
     import argparse
