@@ -6,6 +6,13 @@ try:
     import yaml
 except ImportError:
     abort('PyYaml not found. Install it with "pip install pyyaml"')
+try:
+    from lxml import etree
+except ImportError:
+    abort('lxml not found. Install it with "pip install lxml"')
+
+UTF8 = 'utf8'
+DOCTYPE = '<?xml version="1.0"?>'
 
 class Profile(object):
     def __init__(self, name, parent, config_map):
@@ -36,7 +43,8 @@ class Configuration(object):
     def write_xml(self, out_dir):
         filename = os.path.join(out_dir, self.name + '.xml')
         print('  writing %s ...' % (filename))
-        with open(filename, 'w', encoding='utf8') as xmlfile:
+        with open(filename, 'w', encoding=UTF8) as xmlfile:
+            print(DOCTYPE, file=xmlfile)
             print(hadoop_xml(self.properties), file=xmlfile)
 
     def copy(self):
@@ -68,9 +76,23 @@ def apply_extends(profile_map):
                 else:
                     this.put_configuration(config.copy())
 
+def property_node(key, value):
+    name_node = etree.Element('name')
+    name_node.text = key
+    value_node = etree.Element('value')
+    value_node.text = str(value)
+    p = etree.Element('property')
+    p.append(name_node)
+    p.append(value_node)
+    return p
+
 def hadoop_xml(properties):
-    import json
-    return json.dumps(dict(properties), indent=2)
+    root = etree.Element('configuration')
+    for key, value in properties:
+        root.append(property_node(key, value))
+
+    xml = etree.tostring(root, encoding=UTF8, pretty_print=True)
+    return xml.decode(UTF8)
 
 def make_configuration(extends, document):
     """
@@ -151,7 +173,7 @@ def ensure_dir(out_dir):
         abort('Unable to create directory ' + out_dir)
 
 def main(yaml_file, out_dir):
-    with open(yaml_file, 'r', encoding='utf8') as file:
+    with open(yaml_file, 'r', encoding=UTF8) as file:
         profile_map = parse_config_by_profile(yaml.load_all(file))
         apply_extends(profile_map)
         generate_config_files(out_dir, profile_map.values())
