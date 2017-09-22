@@ -1,0 +1,59 @@
+
+---
+profile:
+  name: local
+  extends: aaa
+
+hadoop-local:
+  fs.defaultFS: file:///
+  mapreduce.framework.name: local
+
+---
+profile.name: localhost
+
+hadoop-localhost:
+  mapreduce.framework.name: local
+  yarn.resourcemanager.address: resourcemanager:8032
+  fs.defaultFS: file://namenode/
+
+---
+profile.name: aaa
+
+hdfs-site:
+  dfs:
+    datanode.data.dir: file:///data1/hdfs/datanode
+    namenode.name.dir: file:///data1/hdfs/namenode
+
+core-site:
+  fs.defaultFS: hdfs://localhost/
+
+yarn-site:
+  yarn:
+    resourcemanager.hostname: resourcemanager.example.com
+    nodemanager:
+      aux-services: mapreduce_shuffle
+      resource:
+        memory-mb: 4096
+        cpu-vcores: 4
+    scheduler:
+      minimum-allocation-mb: 128
+      maximum-allocation-mb: 2048
+      minimum-allocation-vcores: 1
+      maximum-allocation-vcores: 2
+
+mapred-site:
+  yarn.app.mapreduce.am:
+    resource.mb: 1024
+    command-opts: -Xmx768m
+  mapreduce:
+    framework.name: yarn
+    map:
+      cpu.vcores: 1
+      memory.mb: 1024
+      java.opts: -Xmx768m
+    reduce:
+      cpu.vcores: 1
+      memory.mb: 1024
+      java.opts: -Xmx768m
+    jobtracker.address: jobtracker.example.com:8021
+
