@@ -121,5 +121,5 @@ A special profile `default` can be included to provide common properties. Proper
 
 Example:
 
-See [example.yml]()
+See [example.yml](example.yml)
 
