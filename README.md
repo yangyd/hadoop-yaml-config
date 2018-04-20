@@ -121,9 +121,5 @@ A special profile `default` can be included to provide common properties. Proper
 
 Example:
 
-```
-TODO
-```
-
-
+See [example.yml]()
 
